@@ -1,0 +1,203 @@
+version: '3'
+
+services:
+  user_db:
+    container_name: user_db
+    image: postgres:13
+    environment:
+      POSTGRES_DB: user_service_db
+      POSTGRES_USER: user_service_user
+      POSTGRES_PASSWORD: user_service_password
+    volumes:
+      - postgres_data_server_user:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  review_db:
+    container_name: review_db
+    image: postgres:13
+    environment:
+      POSTGRES_DB: review_service_db
+      POSTGRES_USER: review_service_user
+      POSTGRES_PASSWORD: review_service_password
+    volumes:
+      - postgres_data_server_review:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+  user-service-1:
+    container_name: user-service-1
+    build: 
+      context: ./user_service
+    entrypoint: ["./entrypoint.sh"]
+    volumes:
+      - ./user_service:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - user_db
+      - api-gateway
+      - service-discovery
+    environment:
+      - PORT=8000
+      - DATABASE_URL=postgres://user_service_user:user_service_password@user_db:5432/user_service_db
+      - SERVICE_DISCOVERY_HOST=service-discovery:50051 # The gRPC host and port for the service discovery
+      - SERVICE_TYPE=user
+
+  user-service-2:
+    container_name: user-service-2
+    build: 
+      context: ./user_service
+    entrypoint: ["./entrypoint.sh"]
+    volumes:
+      - ./user_service:/app
+    ports:
+      - "8001:8000"
+    depends_on:
+      - user_db
+      - api-gateway
+      - service-discovery
+
+    environment:
+      - PORT=8001
+      - DATABASE_URL=postgres://user_service_user:user_service_password@user_db:5432/user_service_db
+      - SERVICE_DISCOVERY_HOST=service-discovery:50051 # The gRPC host and port for the service discovery
+      - SERVICE_TYPE=user
+
+  user-service-3:
+    container_name: user-service-3
+    build: 
+      context: ./user_service
+    entrypoint: ["./entrypoint.sh"]
+    volumes:
+      - ./user_service:/app
+    ports:
+      - "8002:8000"
+    depends_on:
+      - user_db
+      - api-gateway
+      - service-discovery
+
+    environment:
+      - PORT=8002
+      - DATABASE_URL=postgres://user_service_user:user_service_password@user_db:5432/user_service_db
+      - SERVICE_DISCOVERY_HOST=service-discovery:50051 # The gRPC host and port for the service discovery
+      - SERVICE_TYPE=user
+
+  review-service-1:
+    container_name: review-service-1
+    build: 
+      context: ./review_service
+    entrypoint: ["./entrypoint.sh"]
+    volumes:
+      - ./review_service:/app
+    ports:
+      - "8003:8000"
+    depends_on:
+      - review_db
+      - channels_redis
+      - api-gateway
+      - service-discovery
+
+    environment:
+      - PORT=8003
+      - DATABASE_URL=postgres://review_service_user:review_service_password@review_db:5432/review_service_db
+      - REDIS_HOST=channels_redis
+      - REDIS_PORT=6379
+      - API_GATEWAY_URL=http://api-gateway:8000/
+      - DJANGO_SETTINGS_MODULE=review_service.settings
+      - SERVICE_DISCOVERY_HOST=service-discovery:50051 # The gRPC host and port for the service discovery
+      - SERVICE_TYPE=review
+
+  review-service-2:
+    container_name: review-service-2
+    build: 
+      context: ./review_service
+    entrypoint: ["./entrypoint.sh"]
+    volumes:
+      - ./review_service:/app
+    ports:
+      - "8004:8000"
+    depends_on:
+      - review_db
+      - channels_redis
+      - api-gateway
+      - service-discovery
+
+    environment:
+      - PORT=8004
+      - DATABASE_URL=postgres://review_service_user:review_service_password@review_db:5432/review_service_db
+      - REDIS_HOST=channels_redis
+      - REDIS_PORT=6379
+      - API_GATEWAY_URL=http://api-gateway:8000/
+      - DJANGO_SETTINGS_MODULE=review_service.settings
+      - SERVICE_DISCOVERY_HOST=service-discovery:50051 # The gRPC host and port for the service discovery
+      - SERVICE_TYPE=review
+
+  review-service-3:
+    container_name: review-service-3
+    build: 
+      context: ./review_service
+    entrypoint: ["./entrypoint.sh"]
+    volumes:
+      - ./review_service:/app
+    ports:
+      - "8005:8000"
+    depends_on:
+      - review_db
+      - channels_redis
+      - api-gateway
+      - service-discovery
+
+    environment:
+      - PORT=8005
+      - DATABASE_URL=postgres://review_service_user:review_service_password@review_db:5432/review_service_db
+      - REDIS_HOST=channels_redis
+      - REDIS_PORT=6379
+      - API_GATEWAY_URL=http://api-gateway:8000/
+      - DJANGO_SETTINGS_MODULE=review_service.settings
+      - SERVICE_DISCOVERY_HOST=service-discovery:50051 # The gRPC host and port for the service discovery
+      - SERVICE_TYPE=review
+
+  channels_redis:
+    container_name: channels_redis
+    image: redis:latest
+    ports: 
+      - "6379:6379"
+    command: redis-server --save "" --appendonly no
+
+  service_metadata:
+    container_name: service_metadata
+    image: redis:latest
+    ports:
+      - "6380:6379"
+    command: redis-server --save "" --appendonly no
+    
+  api-gateway:
+    container_name: api-gateway
+    build:
+      context: ./api_gateway
+    environment:
+      - PORT=8080
+      - SERV_REST_PORT=8000
+      - SERV_TIMEOUT_MS=4000
+      - MAX_CONCURRENT_REQUESTS=1
+      - SERVICE_METADATA_URL=redis://service_metadata:6379
+    ports:
+      - "8080:8080"
+
+  service-discovery:
+    container_name: service-discovery
+    depends_on:
+      - service_metadata
+    build:
+      context: ./service_discovery
+    environment:
+      - SERVICE_METADATA_URL=redis://service_metadata:6379
+      - PORT=50051
+    ports:
+      - "50051:50051"
+
+volumes:
+  postgres_data_server_user:
+  postgres_data_server_review:
