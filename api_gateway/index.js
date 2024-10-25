@@ -89,6 +89,24 @@ async function shutdown(signal) {
     });
 }
 
+async function serviceLoad(ips){
+    let minLoad = MAX_CONCURRENT_REQUESTS+1;
+    let minIp;
+    for(let i = 0; i < ips.length; i++){
+        // console.log(`ip ${ips[i]}`);
+        const newKey = CONCURRENT_REQUESTS_KEY + ips[i];
+        // console.log(`new key ${newKey}`);
+        let concurrent = await redisClient.get(newKey);
+        concurrent = concurrent ? parseInt(concurrent, 10) : 0;
+        // console.log(`CONCURRENT: ${concurrent} MIN LOAD ${minLoad}`);
+        if (concurrent < minLoad){
+            minLoad = concurrent;
+            minIp = i;
+        }
+    }
+    return minIp;
+}
+
 ['SIGINT', 'SIGTERM'].forEach(signal => process.on(signal, () => shutdown(signal)));
 
 app.use(express.json());
@@ -121,21 +139,7 @@ app.use('/user-service', async (req, res, next) => {
             usersIndex = (usersIndex + 1) % ips.length;
         } else {
             // service load
-            let minLoad = MAX_CONCURRENT_REQUESTS+1;
-            let minIp;
-            for(let i = 0; i < ips.length; i++){
-                // console.log(`ip ${ips[i]}`);
-                const newKey = CONCURRENT_REQUESTS_KEY + ips[i];
-                // console.log(`new key ${newKey}`);
-                let concurrent = await redisClient.get(newKey);
-                concurrent = concurrent ? parseInt(concurrent, 10) : 0;
-                // console.log(`CONCURRENT: ${concurrent} MIN LOAD ${minLoad}`);
-                if (concurrent < minLoad){
-                    minLoad = concurrent;
-                    minIp = i;
-                }
-            }
-            usersIndex = minIp;
+            usersIndex = serviceLoad(ips);
             // console.log(`MIN IP ${minIp}`)
             // end service load
         }
@@ -192,19 +196,7 @@ app.use('/review-service', async (req, res, next) => {
             reviewsIndex = (reviewsIndex + 1) % ips.length
         } else {
             // service load
-            let minLoad = Infinity;
-            let minIp;
-            for(i in ips){
-                let newKey = CONCURRENT_REQUESTS_KEY + i;
-                let concurrent = await redisClient.get(newKey);
-                concurrent = concurrent ? parseInt(concurrent, 10) : 0;
-                console.log(`CONCURRENT: ${concurrent} MIN LOAD ${minLoad}`)
-                if (concurrent < minLoad){
-                    minLoad = concurrent;
-                    minIp = i;
-                }
-            }
-            usersIndex = minIp;
+            usersIndex = serviceLoad(ips);
             // console.log(`MIN IP ${minIp}`)
             // end service load
         }
