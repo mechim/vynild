@@ -16,7 +16,7 @@ const MAX_CONCURRENT_REQUESTS = process.env.MAX_CONCURRENT_REQUESTS;
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL;
 const REVIEW_SERVICE_URL = process.env.REVIEW_SERVICE_URL;
 const SERVICE_METADATA_URL = process.env.SERVICE_METADATA_URL; // Redis URL storing metadata
-const ROUND_ROBIN = true;
+const ROUND_ROBIN = false;
 
 const FAIL_COUNT_KEY = "fail_count:"; // circuit breaker
 const CURRENT_LOAD_KEY = "current_load:";// health
@@ -55,7 +55,7 @@ async function writeCurrentLoad(ip){
         await redisClient.incr(newKey);
     }
     //magic number 2
-    if (concurrent >= 2){
+    if (concurrent >= 60){
         console.log(`ALERT!!! ${ip} HAS TOO MANY TASKS PER MINUTE IM SCARED`);
     }
 }
@@ -72,7 +72,7 @@ async function circuitBreak(ip, serviceType){
         await redisClient.incr(newKey);
     }
     //magic number 3
-    if (concurrent >= 0){
+    if (concurrent >= 3){
         console.log(`${ip} ETA HUYNA ZAFEYLILASY BOLSHE 3 RAZ`);
         const redisKey = `service:${serviceType}`;
         redisClient.lRem(redisKey, 0, ip);
@@ -104,6 +104,7 @@ async function serviceLoad(ips){
             minIp = i;
         }
     }
+    // console.log(minIp);
     return minIp;
 }
 
@@ -139,7 +140,7 @@ app.use('/user-service', async (req, res, next) => {
             usersIndex = (usersIndex + 1) % ips.length;
         } else {
             // service load
-            usersIndex = serviceLoad(ips);
+            usersIndex = await serviceLoad(ips);
             // console.log(`MIN IP ${minIp}`)
             // end service load
         }
