@@ -11,14 +11,15 @@ require('dotenv').config();
 
 const PORT = process.env.PORT;
 const SERV_REST_PORT = process.env.SERV_REST_PORT;
-const SERVER_TIMEOUT_MS = process.env.SERV_TIMEOUT_MS;
+// const SERVER_TIMEOUT_MS = process.env.SERV_TIMEOUT_MS;
+const SERVER_TIMEOUT_MS = 9000;
 const MAX_CONCURRENT_REQUESTS = process.env.MAX_CONCURRENT_REQUESTS;
 const USER_SERVICE_URL = process.env.USER_SERVICE_URL;
 const REVIEW_SERVICE_URL = process.env.REVIEW_SERVICE_URL;
 const SERVICE_METADATA_URL = process.env.SERVICE_METADATA_URL; // Redis URL storing metadata
-const ROUND_ROBIN = false;
+const ROUND_ROBIN = true;
 
-const FAIL_COUNT_KEY = "fail_count:"; // circuit breaker
+// const FAIL_COUNT_KEY = "fail_count:"; // circuit breaker
 const CURRENT_LOAD_KEY = "current_load:";// health
 const CONCURRENT_REQUESTS_KEY = "concurrent_requests:"; //
 
@@ -31,15 +32,15 @@ async function limitTasks(ip){
     const newKey = CONCURRENT_REQUESTS_KEY + ip;
     let concurrent = await redisClient.get(newKey, 0);
     concurrent = concurrent ? parseInt(concurrent, 10) : 0;
-
     if (concurrent === 0){
         await redisClient.set(newKey, 1,'EX', 1);
     } else {
         await redisClient.incr(newKey);
     }
+    console.log(`CONCURRENT: ${concurrent} MAX: ${MAX_CONCURRENT_REQUESTS}`);
 
     if (concurrent >= MAX_CONCURRENT_REQUESTS){
-        return (new Error(`TASK LIMITER LIMITED THE TASKS`));
+        throw new Error(`TASK LIMITER LIMITED THE TASKS`);
     }
 }
 
@@ -61,22 +62,27 @@ async function writeCurrentLoad(ip){
 }
 
 //circuit breaker
-async function circuitBreak(ip, serviceType){
-    const newKey = FAIL_COUNT_KEY + ip;
-    let concurrent = await redisClient.get(newKey);
-    concurrent = concurrent ? parseInt(concurrent, 10) : 0;
+async function circuitBreak(requestData, ip, serviceType){
+   let tries = 1;
+
+   while (tries < 3){
+    try{
+        console.log(`circuit breaker tries ${tries}`);
+        const response = await axios(requestData);
+        if (response.code === 500){
+            throw new Error("SERVICE ERROR");
+        }
+        return response;
+    } catch(error){
+        console.log(error.message);
+        tries++;
+    }
     
-    if (concurrent === 0){
-        await redisClient.set(newKey, 1,'EX', 1);
-    } else {
-        await redisClient.incr(newKey);
-    }
-    //magic number 3
-    if (concurrent >= 3){
-        console.log(`${ip} ETA HUYNA ZAFEYLILASY BOLSHE 3 RAZ`);
-        const redisKey = `service:${serviceType}`;
-        redisClient.lRem(redisKey, 0, ip);
-    }
+   }
+
+   const redisKey = `service:${serviceType}`;
+   await redisClient.lRem(redisKey, 0, ip); 
+   return new Error(`CIRCUIT BROKE ON IP ${ip}`);
 
 }
 
@@ -129,9 +135,10 @@ async function getServiceIps(serviceType){
 // Route to User Service
 app.use('/user-service', async (req, res, next) => {
     let ip;
+    let requestData;
     try {
        const ips = await getServiceIps('user');
-        
+        console.log(ips);
         if (ips.length === 0){
             return res.status(503).json({detail: "No available services ^^"});
         }
@@ -151,31 +158,30 @@ app.use('/user-service', async (req, res, next) => {
         await writeCurrentLoad(ip);
         
         const serviceUrl = `http://${ip}:${SERV_REST_PORT}/${req.url.slice(1)}`;
-        const response = await axios({
+        requestData = {
             method: req.method,
             url: serviceUrl,
             data: req.body,
             headers: req.headers,
             timeout: SERVER_TIMEOUT_MS,
-        });
+        }
+        const response = await axios(requestData);
 
         res.status(response.status).send(response.data);
 
-    } catch (error) {
-        if (error.code === 'ECONNABORTED') {
-            await circuitBreak(ip, 'user');
-            res.status(504).json({ detail: "Request timed out." });
-        } else if (error.message === "TASK LIMITER LIMITED THE TASKS"){
+    }  catch (error) {
+        if (error.message === `TASK LIMITER LIMITED THE TASKS`){
             res.status(503).json({detail: error.message})
+        } else{
+            response = await circuitBreak(requestData, ip, 'user');
+            if (response instanceof Error){
+                res.status(503).json({detail: response.message})
+            } else {
+                res.status(response.status).send(response.data)
+            }
         }
-         else {
-            // Extract details from the error response if it exists
-            const errorResponse = error.response?.data || { detail: error.message };
-
-            // Forward the status code and error details from the service
-            res.status(error.response?.status || 500).json(errorResponse);
-        }
-    } finally{
+        
+        } finally{
         if (ip){
             await redisClient.decr(CONCURRENT_REQUESTS_KEY+ip);
         }
@@ -185,6 +191,7 @@ app.use('/user-service', async (req, res, next) => {
 // Route to Review Service
 app.use('/review-service', async (req, res, next) => {
     let ip;
+    let requestData;
     try {
         const ips = await getServiceIps('review');
         
@@ -197,7 +204,7 @@ app.use('/review-service', async (req, res, next) => {
             reviewsIndex = (reviewsIndex + 1) % ips.length
         } else {
             // service load
-            usersIndex = serviceLoad(ips);
+            reviewsIndex = serviceLoad(ips);
             // console.log(`MIN IP ${minIp}`)
             // end service load
         }
@@ -207,32 +214,31 @@ app.use('/review-service', async (req, res, next) => {
         await limitTasks(ip);
         await writeCurrentLoad(ip)
         
-        const serviceUrl = `http://${ip}:${SERV_REST_PORT}/${req.url.slice(1)}`
-        const response = await axios({
+        const serviceUrl = `http://${ip}:${SERV_REST_PORT}/${req.url.slice(1)}`;
+        requestData = {
             method: req.method,
             url: serviceUrl,
             data: req.body,
             headers: req.headers,
             timeout: SERVER_TIMEOUT_MS,
-        });
+        }
+        const response = await axios();
 
         res.status(response.status).send(response.data);
 
     } catch (error) {
-        if (error.code === 'ECONNABORTED') {
-            await circuitBreak(ip, 'review');
-            res.status(504).json({ detail: "Request timed out." });
-        } else if (error.message === `TASK LIMITER LIMITED THE TASKS`) {
+        if (error.message === `TASK LIMITER LIMITED THE TASKS`){
             res.status(503).json({detail: error.message})
+        } else{
+            response = await circuitBreak(requestData, ip, 'review');
+            if (response instanceof Error){
+                res.status(503).json({detail: error.message})
+            } else {
+                res.status(response.status).send(response.data)
+            }
+                
         }
         
-        else {
-            // Extract details from the error response if it exists
-            const errorResponse = error.response?.data || { detail: error.message };
-
-            // Forward the status code and error details from the service
-            res.status(error.response?.status || 500).json(errorResponse);
-        }
     } finally{
         if (ip){
             await redisClient.decr(CONCURRENT_REQUESTS_KEY+ip);

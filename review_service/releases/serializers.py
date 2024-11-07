@@ -13,9 +13,9 @@ class ReleaseCreateSerializer(serializers.ModelSerializer):
         fields = ['release_name', 'artist_name']
     
     def create(self, validated_data):
-        return super().create(validated_data)
+        return Release.objects.create(**validated_data)
     
 class ReleaseDiscussionIdentifierGetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Release
-        fields = ['discussion_identifier']
+        fields = ['discussion_identifier', 'connect_url']

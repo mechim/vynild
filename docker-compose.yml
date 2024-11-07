@@ -104,7 +104,7 @@ services:
       - DATABASE_URL=postgres://review_service_user:review_service_password@review_db:5432/review_service_db
       - REDIS_HOST=channels_redis
       - REDIS_PORT=6379
-      - API_GATEWAY_URL=http://api-gateway:8000/
+      - API_GATEWAY_URL=http://api-gateway:8080/
       - DJANGO_SETTINGS_MODULE=review_service.settings
       - SERVICE_DISCOVERY_HOST=service-discovery:50051 # The gRPC host and port for the service discovery
       - SERVICE_TYPE=review
@@ -129,7 +129,7 @@ services:
       - DATABASE_URL=postgres://review_service_user:review_service_password@review_db:5432/review_service_db
       - REDIS_HOST=channels_redis
       - REDIS_PORT=6379
-      - API_GATEWAY_URL=http://api-gateway:8000/
+      - API_GATEWAY_URL=http://api-gateway:8080/
       - DJANGO_SETTINGS_MODULE=review_service.settings
       - SERVICE_DISCOVERY_HOST=service-discovery:50051 # The gRPC host and port for the service discovery
       - SERVICE_TYPE=review
@@ -154,7 +154,7 @@ services:
       - DATABASE_URL=postgres://review_service_user:review_service_password@review_db:5432/review_service_db
       - REDIS_HOST=channels_redis
       - REDIS_PORT=6379
-      - API_GATEWAY_URL=http://api-gateway:8000/
+      - API_GATEWAY_URL=http://api-gateway:8080/
       - DJANGO_SETTINGS_MODULE=review_service.settings
       - SERVICE_DISCOVERY_HOST=service-discovery:50051 # The gRPC host and port for the service discovery
       - SERVICE_TYPE=review

@@ -27,10 +27,11 @@ class DiscussionConsumer(AsyncJsonWebsocketConsumer):
         print(cache_key)
         cached_username = cache.get(cache_key)
         if cached_username:
+            print(f"found cached username for user #{user_id}")
             return cached_username
 
          # Fetch the username from the external microservice
-        user_service_url = f'{os.getenv('USER_SERVICE_URL')}users/list?id={user_id}'  # Replace with actual user service URL
+        user_service_url = f'{os.getenv('API_GATEWAY_URL')}user-service/users/list?id={user_id}'  # Replace with actual user service URL
         
         try:
             response = requests.get(user_service_url)
@@ -38,7 +39,7 @@ class DiscussionConsumer(AsyncJsonWebsocketConsumer):
                 user_data = response.json()
                 username = user_data[0].get('username')
                 cache.set(cache_key, username, timeout=3600)
-                print(user_data)
+                print(f"cached username for user #{user_id}")
                 return  username # Assuming the response contains a 'username' field
             else:
                 return "Unknown"  # Handle cases where the user is not found
@@ -59,16 +60,13 @@ class DiscussionConsumer(AsyncJsonWebsocketConsumer):
             # Fetch username for the connected user
             self.username = await self.fetch_username(user_id)
 
-        
+        print(self.username, user_id)
         if self.username in ["Unknown", "Service Unavailable"]:
             await self.send_json({
                 'message': 'error: such a user does not exist'
             })
             await self.close()
             return
-
-        
-
 
         if not await self.check_releases():
             await self.send_json({

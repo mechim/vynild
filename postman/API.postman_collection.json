@@ -1,0 +1,354 @@
+{
+	"info": {
+		"_postman_id": "a8910f92-9fa2-4b8e-8df4-bae7a7eb9a3e",
+		"name": "API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "24564672"
+	},
+	"item": [
+		{
+			"name": "User Service",
+			"item": [
+				{
+					"name": "Users",
+					"item": [
+						{
+							"name": "List",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{user_service_url}}users/list?id=2",
+									"host": [
+										"{{user_service_url}}users"
+									],
+									"path": [
+										"list"
+									],
+									"query": [
+										{
+											"key": "id",
+											"value": "2"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"username\": \"JohnDoe\",\r\n    \"password\": \"12345\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{user_service_url}}users/create",
+									"host": [
+										"{{user_service_url}}users"
+									],
+									"path": [
+										"create"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Utilities",
+					"item": [
+						{
+							"name": "Status",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{user_service_url}}utilities/status",
+									"host": [
+										"{{user_service_url}}utilities"
+									],
+									"path": [
+										"status"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Sleep",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{user_service_url}}utilities/sleep",
+									"host": [
+										"{{user_service_url}}utilities"
+									],
+									"path": [
+										"sleep"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Sleep Copy",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{user_service_url}}utilities/sleep",
+									"host": [
+										"{{user_service_url}}utilities"
+									],
+									"path": [
+										"sleep"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Sleep Copy 2",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{user_service_url}}utilities/sleep",
+									"host": [
+										"{{user_service_url}}utilities"
+									],
+									"path": [
+										"sleep"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Review Service",
+			"item": [
+				{
+					"name": "Reviews",
+					"item": [
+						{
+							"name": "Create",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"user_id\" : \"1\",\r\n    \"release\" : \"1\",\r\n    \"review_text\" : \"me likey\",\r\n    \"review_mark\" : \"10\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{review_service_url}}reviews/create",
+									"host": [
+										"{{review_service_url}}reviews"
+									],
+									"path": [
+										"create"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "List",
+							"protocolProfileBehavior": {
+								"disableBodyPruning": true
+							},
+							"request": {
+								"method": "GET",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{review_service_url}}reviews/list",
+									"host": [
+										"{{review_service_url}}reviews"
+									],
+									"path": [
+										"list"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Releases",
+					"item": [
+						{
+							"name": "List",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{review_service_url}}releases/list?id=",
+									"host": [
+										"{{review_service_url}}releases"
+									],
+									"path": [
+										"list"
+									],
+									"query": [
+										{
+											"key": "id",
+											"value": ""
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"release_name\" : \"To Pimp A Butterfly\",\r\n    \"artist_name\": \"Kednrick Lamar\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{review_service_url}}releases/create",
+									"host": [
+										"{{review_service_url}}releases"
+									],
+									"path": [
+										"create"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Discussion Identifier",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{review_service_url}}releases/1",
+									"host": [
+										"{{review_service_url}}releases"
+									],
+									"path": [
+										"1"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Utilities",
+					"item": [
+						{
+							"name": "Status",
+							"request": {
+								"method": "GET",
+								"header": []
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Gateway",
+			"item": [
+				{
+					"name": "Ping",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8080/ping",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"ping"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "user_service_url",
+			"value": "http://127.0.0.1:8000/",
+			"type": "string"
+		},
+		{
+			"key": "review_service_url",
+			"value": "http://127.0.0.1:8001/",
+			"type": "string"
+		},
+		{
+			"key": "gatewa_url",
+			"value": "http://127.0.0.1:8080/",
+			"type": "string"
+		}
+	]
+}

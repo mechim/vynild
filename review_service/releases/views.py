@@ -24,3 +24,4 @@ class ReleaseDiscussionIdentifierGetView(generics.ListAPIView):
     def get_queryset(self):
         release_id = self.kwargs.get('release_id')
         return Release.objects.filter(id=release_id)
+        
