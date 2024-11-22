@@ -14,7 +14,7 @@ class ReviewListSerializer(serializers.ModelSerializer):
             return cached_username
 
          # Fetch the username from the external microservice
-        user_service_url = f'{os.getenv('USER_SERVICE_URL')}users/list?id={obj.user_id}'  # Replace with actual user service URL
+        user_service_url = f'{os.getenv('API_GATEWAY_URL')}users/list?id={obj.user_id}'  # Replace with actual user service URL
         
         try:
             response = requests.get(user_service_url)

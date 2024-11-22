@@ -93,21 +93,20 @@ async function circuitBreak(requestData, ip, serviceType) {
             logMsg(`LOG: Circuit breaker try ${tries + 1} on IP: ${ip}`);
             response = await axios(requestData);
 
-            // If the response has a 500 status, consider it a failure
-            if (response.status === 500) {
-                throw new Error("SERVICE ERROR");
-            }
-
             return response; // Return successful response
         } catch (error) {
             console.error(`Error on IP ${ip}: ${error.message}`);
             logMsg(`ERROR: Error on IP ${ip}: ${error.message}`)
             tries++;
             console.log(requestData.url);
+            if (error.response.status >= 400 && error.response.status < 500){
+                return error.response;
+            }
             if (tries === 3) {
                 // After 3 failures, remove the failed IP and reroute
                 console.log(`IP ${ip} failed 3 times. Rerouting to a different instance.`);
                 logMsg(`ALERT: IP ${ip} failed 3 times. Rerouting to a different instance.`);
+                
                 await redisClient.lRem(redisKey, 0, ip); // Remove the failing IP
 
                 // Get the next available IP
@@ -280,6 +279,50 @@ app.use('/review-service', async (req, res, next) => {
         }
     }
 });
+
+app.delete('/saga/user/:id', async (req, res) => {
+    const userId = req.params.id;
+    let deletedReviews = [];
+
+    try {
+        // Step 1: Verify the user exists
+        const userResponse = await axios.get(`http://127.0.0.1:${PORT}/user-service/users/list?id=${userId}`);
+        if (!userResponse.data || userResponse.data.length === 0) {
+            return res.status(404).json({ detail: "User not found" });
+        }
+
+        // Step 2: Delete reviews for the user
+        const reviewResponse = await axios.delete(`http://127.0.0.1:${PORT}/review-service/reviews/delete-bulk/${userId}`);
+        deletedReviews = reviewResponse.data.deleted_reviews; // Assume the service returns deleted reviews
+                // console.log(t);
+                console.log(`Deleted reviews for user ${userId}:`, deletedReviews, deletedReviews.length, typeof deletedReviews);
+
+        // Step 3: Delete the user
+        await axios.delete(`http://127.0.0.1:${PORT}/user-service/users/delete?id=${userId}`);
+        console.log(`Deleted user ${userId}`);
+
+        // Success: Respond with success message
+        res.status(200).json({ detail: `User ${userId} and related reviews deleted successfully` });
+    } catch (error) {
+        console.error(`Error in saga for deleting user ${userId}:`, error.message);
+        // Step 4: Recover deleted reviews if user deletion failed
+        if (deletedReviews.length > 0) {
+            try {
+                // const jsonReviews = reviews.map(review => JSON.stringify(review));
+                await axios.post(`http://127.0.0.1:${PORT}/review-service/reviews/create-bulk`, deletedReviews , {
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                console.log(`Recovered deleted reviews for user ${userId}`);
+            } catch (recoveryError) {
+                console.error(`Failed to recover deleted reviews for user ${userId}:`, recoveryError.message);
+            }
+        }
+
+        // Respond with an error message
+        res.status(500).json({ detail: `Saga failed: ${error.message}` });
+    }
+});
+
 
 server = app.listen(PORT, () => {
     console.log(`API Gateway listening at http://127.0.0.1:${PORT}`);
