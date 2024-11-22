@@ -1,7 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const redis = require('redis');
-// const winston = require('winston');
+const winston = require('winston');
 const app = express();
 // Middleware to parse JSON body
 app.use(express.json());
@@ -27,25 +27,25 @@ const CONCURRENT_REQUESTS_KEY = "concurrent_requests:"; //
 const redisClient = redis.createClient({ url: SERVICE_METADATA_URL });
 redisClient.connect();
 
-// const LOGSTASH_HOST = process.env.LOGSTASH_HOST || "logstash";
-// const LOGSTASH_HTTP_PORT = process.env.LOGSTASH_HTTP_PORT || 6000;
+const LOGSTASH_HOST = process.env.LOGSTASH_HOST || "logstash";
+const LOGSTASH_HTTP_PORT = process.env.LOGSTASH_HTTP_PORT || 6000;
 // Initialize Winston logger
-// const logger = winston.createLogger({
-//     transports: [
-//         new winston.transports.Console(),
-//         new winston.transports.Http({
-//             host: LOGSTASH_HOST,
-//             port: LOGSTASH_HTTP_PORT,
-//             level: 'info',
-//         })
-//     ],
-// });
-// function logMsg(msg) {
-//     logger.info(JSON.stringify({
-//         "service": "api_gateway",
-//         "msg": msg
-//     }));
-// }
+const logger = winston.createLogger({
+    transports: [
+        new winston.transports.Console(),
+        new winston.transports.Http({
+            host: LOGSTASH_HOST,
+            port: LOGSTASH_HTTP_PORT,
+            level: 'info',
+        })
+    ],
+});
+function logMsg(msg) {
+    logger.info(JSON.stringify({
+        "service": "api_gateway",
+        "msg": msg
+    }));
+}
 
 //task limiter
 async function limitTasks(ip){
@@ -90,7 +90,7 @@ async function circuitBreak(requestData, ip, serviceType) {
     while (tries < 3) {
         try {
             console.log(`Circuit breaker try ${tries + 1} on IP: ${ip}`);
-            // logMsg(`LOG: Circuit breaker try ${tries + 1} on IP: ${ip}`);
+            logMsg(`LOG: Circuit breaker try ${tries + 1} on IP: ${ip}`);
             response = await axios(requestData);
 
             // If the response has a 500 status, consider it a failure
@@ -101,20 +101,20 @@ async function circuitBreak(requestData, ip, serviceType) {
             return response; // Return successful response
         } catch (error) {
             console.error(`Error on IP ${ip}: ${error.message}`);
-            // logMsg(`ERROR: Error on IP ${ip}: ${error.message}`)
+            logMsg(`ERROR: Error on IP ${ip}: ${error.message}`)
             tries++;
             console.log(requestData.url);
             if (tries === 3) {
                 // After 3 failures, remove the failed IP and reroute
                 console.log(`IP ${ip} failed 3 times. Rerouting to a different instance.`);
-                // logMsg(`ALERT: IP ${ip} failed 3 times. Rerouting to a different instance.`);
+                logMsg(`ALERT: IP ${ip} failed 3 times. Rerouting to a different instance.`);
                 await redisClient.lRem(redisKey, 0, ip); // Remove the failing IP
 
                 // Get the next available IP
                 const ips = await redisClient.lRange(redisKey, 0, -1);
                 if (ips.length === 0) {
                     console.error(`No alternative instances available for service ${serviceType}`);
-                    // logMsg(`ALERT: No alternative instances available for service ${serviceType}`);
+                    logMsg(`ALERT: No alternative instances available for service ${serviceType}`);
                     break;
                 }
 
@@ -191,6 +191,8 @@ app.use('/user-service', async (req, res, next) => {
         await writeCurrentLoad(ip);
         
         const serviceUrl = `http://${ip}:${SERV_REST_PORT}/${req.url.slice(1)}`;
+        logMsg(`LOG: ${req.method} request to ${serviceUrl}`);
+
         requestData = {
             method: req.method,
             url: serviceUrl,
@@ -286,11 +288,11 @@ server = app.listen(PORT, () => {
 
 async function shutdown(signal) {
     console.log(`Received ${signal}. Closing Redis and HTTP server...`);
-    // logMsg(`LOG: Received ${signal}. Closing Redis and HTTP server...`);
+    logMsg(`LOG: Received ${signal}. Closing Redis and HTTP server...`);
     await redisClient.quit();
     server.close(() => {
         console.log('Express server closed.');
-        // logMsg('LOG: Express server closed');
+        logMsg('LOG: Express server closed');
         process.exit(0);
     });
 }
