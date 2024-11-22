@@ -1,7 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const redis = require('redis');
-
+// const winston = require('winston');
 const app = express();
 // Middleware to parse JSON body
 app.use(express.json());
@@ -26,6 +26,26 @@ const CONCURRENT_REQUESTS_KEY = "concurrent_requests:"; //
 //Redis client setup
 const redisClient = redis.createClient({ url: SERVICE_METADATA_URL });
 redisClient.connect();
+
+// const LOGSTASH_HOST = process.env.LOGSTASH_HOST || "logstash";
+// const LOGSTASH_HTTP_PORT = process.env.LOGSTASH_HTTP_PORT || 6000;
+// Initialize Winston logger
+// const logger = winston.createLogger({
+//     transports: [
+//         new winston.transports.Console(),
+//         new winston.transports.Http({
+//             host: LOGSTASH_HOST,
+//             port: LOGSTASH_HTTP_PORT,
+//             level: 'info',
+//         })
+//     ],
+// });
+// function logMsg(msg) {
+//     logger.info(JSON.stringify({
+//         "service": "api_gateway",
+//         "msg": msg
+//     }));
+// }
 
 //task limiter
 async function limitTasks(ip){
@@ -62,55 +82,68 @@ async function writeCurrentLoad(ip){
 }
 
 //circuit breaker
-async function circuitBreak(requestData, ip, serviceType){
-   let tries = 1;
+async function circuitBreak(requestData, ip, serviceType) {
+    const redisKey = `service:${serviceType}`;
+    let tries = 0;
+    let response;
 
-   while (tries < 3){
-    try{
-        console.log(`circuit breaker tries ${tries}`);
-        const response = await axios(requestData);
-        if (response.code === 500){
-            throw new Error("SERVICE ERROR");
+    while (tries < 3) {
+        try {
+            console.log(`Circuit breaker try ${tries + 1} on IP: ${ip}`);
+            // logMsg(`LOG: Circuit breaker try ${tries + 1} on IP: ${ip}`);
+            response = await axios(requestData);
+
+            // If the response has a 500 status, consider it a failure
+            if (response.status === 500) {
+                throw new Error("SERVICE ERROR");
+            }
+
+            return response; // Return successful response
+        } catch (error) {
+            console.error(`Error on IP ${ip}: ${error.message}`);
+            // logMsg(`ERROR: Error on IP ${ip}: ${error.message}`)
+            tries++;
+            console.log(requestData.url);
+            if (tries === 3) {
+                // After 3 failures, remove the failed IP and reroute
+                console.log(`IP ${ip} failed 3 times. Rerouting to a different instance.`);
+                // logMsg(`ALERT: IP ${ip} failed 3 times. Rerouting to a different instance.`);
+                await redisClient.lRem(redisKey, 0, ip); // Remove the failing IP
+
+                // Get the next available IP
+                const ips = await redisClient.lRange(redisKey, 0, -1);
+                if (ips.length === 0) {
+                    console.error(`No alternative instances available for service ${serviceType}`);
+                    // logMsg(`ALERT: No alternative instances available for service ${serviceType}`);
+                    break;
+                }
+
+                ip = ips[0]; // Select the next IP
+                requestData.url = requestData.url.replace(`http://${requestData.url.split('/')[2]}`, `http://${ip}:${SERV_REST_PORT}`);
+                tries = 0; // Reset the tries for the new IP
+            }
         }
-        return response;
-    } catch(error){
-        console.log(error.message);
-        tries++;
     }
-    
-   }
 
-   const redisKey = `service:${serviceType}`;
-   await redisClient.lRem(redisKey, 0, ip); 
-   return new Error(`CIRCUIT BROKE ON IP ${ip}`);
-
+    // If all IPs fail, return an error
+    return new Error(`All attempts failed for service type ${serviceType}`);
 }
 
-async function shutdown(signal) {
-    console.log(`Received ${signal}. Closing Redis and HTTP server...`);
-    await redisClient.quit();
-    server.close(() => {
-        console.log('Express server closed.');
-        process.exit(0);
-    });
-}
+
+
 
 async function serviceLoad(ips){
     let minLoad = MAX_CONCURRENT_REQUESTS+1;
     let minIp;
     for(let i = 0; i < ips.length; i++){
-        // console.log(`ip ${ips[i]}`);
         const newKey = CONCURRENT_REQUESTS_KEY + ips[i];
-        // console.log(`new key ${newKey}`);
         let concurrent = await redisClient.get(newKey);
         concurrent = concurrent ? parseInt(concurrent, 10) : 0;
-        // console.log(`CONCURRENT: ${concurrent} MIN LOAD ${minLoad}`);
         if (concurrent < minLoad){
             minLoad = concurrent;
             minIp = i;
         }
     }
-    // console.log(minIp);
     return minIp;
 }
 
@@ -246,6 +279,18 @@ app.use('/review-service', async (req, res, next) => {
     }
 });
 
-app.listen(PORT, () => {
+server = app.listen(PORT, () => {
     console.log(`API Gateway listening at http://127.0.0.1:${PORT}`);
+    // logMsg(`LOG: API Gateway listening at http://127.0.0.1:${PORT}`);
 });
+
+async function shutdown(signal) {
+    console.log(`Received ${signal}. Closing Redis and HTTP server...`);
+    // logMsg(`LOG: Received ${signal}. Closing Redis and HTTP server...`);
+    await redisClient.quit();
+    server.close(() => {
+        console.log('Express server closed.');
+        // logMsg('LOG: Express server closed');
+        process.exit(0);
+    });
+}

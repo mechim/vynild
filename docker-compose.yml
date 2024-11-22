@@ -12,6 +12,8 @@ services:
       - postgres_data_server_user:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    networks:
+      - pad-network
 
   review_db:
     container_name: review_db
@@ -24,6 +26,8 @@ services:
       - postgres_data_server_review:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    networks:
+      - pad-network
 
   user-service-1:
     container_name: user-service-1
@@ -43,7 +47,10 @@ services:
       - DATABASE_URL=postgres://user_service_user:user_service_password@user_db:5432/user_service_db
       - SERVICE_DISCOVERY_HOST=service-discovery:50051 # The gRPC host and port for the service discovery
       - SERVICE_TYPE=user
-
+      - AWAKE_INSTANCE=0
+    networks:
+      - pad-network
+      
   user-service-2:
     container_name: user-service-2
     build: 
@@ -57,12 +64,14 @@ services:
       - user_db
       - api-gateway
       - service-discovery
-
     environment:
       - PORT=8001
       - DATABASE_URL=postgres://user_service_user:user_service_password@user_db:5432/user_service_db
       - SERVICE_DISCOVERY_HOST=service-discovery:50051 # The gRPC host and port for the service discovery
       - SERVICE_TYPE=user
+      - AWAKE_INSTANCE=0
+    networks:
+      - pad-network
 
   user-service-3:
     container_name: user-service-3
@@ -77,12 +86,14 @@ services:
       - user_db
       - api-gateway
       - service-discovery
-
     environment:
       - PORT=8002
       - DATABASE_URL=postgres://user_service_user:user_service_password@user_db:5432/user_service_db
       - SERVICE_DISCOVERY_HOST=service-discovery:50051 # The gRPC host and port for the service discovery
       - SERVICE_TYPE=user
+      - AWAKE_INSTANCE=1
+    networks:
+      - pad-network
 
   review-service-1:
     container_name: review-service-1
@@ -98,7 +109,6 @@ services:
       - channels_redis
       - api-gateway
       - service-discovery
-
     environment:
       - PORT=8003
       - DATABASE_URL=postgres://review_service_user:review_service_password@review_db:5432/review_service_db
@@ -108,6 +118,8 @@ services:
       - DJANGO_SETTINGS_MODULE=review_service.settings
       - SERVICE_DISCOVERY_HOST=service-discovery:50051 # The gRPC host and port for the service discovery
       - SERVICE_TYPE=review
+    networks:
+      - pad-network
 
   review-service-2:
     container_name: review-service-2
@@ -123,7 +135,6 @@ services:
       - channels_redis
       - api-gateway
       - service-discovery
-
     environment:
       - PORT=8004
       - DATABASE_URL=postgres://review_service_user:review_service_password@review_db:5432/review_service_db
@@ -133,6 +144,8 @@ services:
       - DJANGO_SETTINGS_MODULE=review_service.settings
       - SERVICE_DISCOVERY_HOST=service-discovery:50051 # The gRPC host and port for the service discovery
       - SERVICE_TYPE=review
+    networks:
+      - pad-network
 
   review-service-3:
     container_name: review-service-3
@@ -148,7 +161,6 @@ services:
       - channels_redis
       - api-gateway
       - service-discovery
-
     environment:
       - PORT=8005
       - DATABASE_URL=postgres://review_service_user:review_service_password@review_db:5432/review_service_db
@@ -158,6 +170,8 @@ services:
       - DJANGO_SETTINGS_MODULE=review_service.settings
       - SERVICE_DISCOVERY_HOST=service-discovery:50051 # The gRPC host and port for the service discovery
       - SERVICE_TYPE=review
+    networks:
+      - pad-network
 
   channels_redis:
     container_name: channels_redis
@@ -165,6 +179,8 @@ services:
     ports: 
       - "6379:6379"
     command: redis-server --save "" --appendonly no
+    networks:
+      - pad-network
 
   service_metadata:
     container_name: service_metadata
@@ -172,6 +188,8 @@ services:
     ports:
       - "6380:6379"
     command: redis-server --save "" --appendonly no
+    networks:
+      - pad-network
     
   api-gateway:
     container_name: api-gateway
@@ -181,10 +199,12 @@ services:
       - PORT=8080
       - SERV_REST_PORT=8000
       - SERV_TIMEOUT_MS=4000
-      - MAX_CONCURRENT_REQUESTS=1
+      - MAX_CONCURRENT_REQUESTS=3
       - SERVICE_METADATA_URL=redis://service_metadata:6379
     ports:
       - "8080:8080"
+    networks:
+      - pad-network
 
   service-discovery:
     container_name: service-discovery
@@ -197,7 +217,75 @@ services:
       - PORT=50051
     ports:
       - "50051:50051"
+    networks:
+      - pad-network
+    volumes:
+      - service_discovery-data:/app/logs
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.14.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - pad-network
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.14.0
+    container_name: logstash
+    ports:
+      - "5000:5000"
+      - "9600:9600"
+    networks:
+      - pad-network
+    volumes:
+      - ./config/logstash/pipeline:/usr/share/logstash/pipeline
+    depends_on:
+      - elasticsearch
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.14.0
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    networks:
+      - pad-network
+    depends_on:
+      - elasticsearch
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.15.3
+    container_name: filebeat
+    command: ["filebeat", "-e", "-strict.perms=false"]
+    networks:
+      - pad-network
+    volumes:
+      - ./config/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml
+      - service_discovery-data:/usr/share/filebeat/data
+    depends_on:
+      - logstash
 
 volumes:
   postgres_data_server_user:
   postgres_data_server_review:
+  elasticsearch-data:
+  service_discovery-data:
+
+
+networks:
+  pad-network:
+    driver: bridge

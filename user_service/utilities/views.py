@@ -15,9 +15,11 @@ class StatusCheckView(APIView):
         )
 class SleepyView(APIView):
     def get(self, request):
-        time.sleep(int(os.getenv('SLEEP_DURATION_S', 10)))
+        if not int(os.getenv('AWAKE_INSTANCE', 1)):
+            time.sleep(int(os.getenv('SLEEP_DURATION_S', 10)))
 
         return response.Response(
-            {'message': "You are not supposed to see this message!"},
+            {'message': "Sleepy Time! hee hee... You are not supposed to see this message!"},
             status=status.HTTP_202_ACCEPTED
         )
+    

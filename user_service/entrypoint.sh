@@ -8,4 +8,5 @@ python service_registration/grpc_registration.py
 
 # run the app
 # exec gunicorn --bind 0.0.0.0:8000 user_service.wsgi:application
-exec gunicorn --bind 0.0.0.0:8000 user_service.wsgi:application --reload --access-logfile '-' --error-logfile '-'
+# exec gunicorn --bind 0.0.0.0:8000 user_service.wsgi:application --reload --access-logfile '-' --error-logfile '-'
+exec gunicorn --bind 0.0.0.0:8000 --reload --log-level info --access-logfile - --error-logfile - user_service.wsgi:application

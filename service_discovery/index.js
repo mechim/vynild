@@ -1,12 +1,24 @@
 const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
 const redis = require('redis');
+const winston = require('winston');
 
 // Load environment variables
 require('dotenv').config();
 
 const PORT = process.env.PORT;
 const SERVICE_METADATA_URL = process.env.SERVICE_METADATA_URL;
+
+// Initialize Winston logger
+const logger = winston.createLogger({
+    transports: [
+        new winston.transports.Console(),
+        new winston.transports.File({
+            filename: './logs/service_discovery.log',
+            level: 'info',
+        })
+    ],
+});
 
 // Connect to Redis
 const redisClient = redis.createClient({ url: SERVICE_METADATA_URL });
@@ -30,6 +42,10 @@ function registerService(call, callback) {
         .then(() => {
             console.log(`Registered ${redisKey} at IP - ${ipAddress}`);
             callback(null, { success: true, detail: `Service ${serviceName} registered successfully.` });
+            logger.info(JSON.stringify({
+                "service": 'service_discovery',
+                "msg": `LOG: Registered ${redisKey} at IP - ${ip}`,
+            }));
         })
         .catch(err => {
             console.error('Redis error:', err);
@@ -51,12 +67,20 @@ function startGrpcServer() {
     
     server.bindAsync(`0.0.0.0:${PORT}`, grpc.ServerCredentials.createInsecure(), () => {
         console.log(`gRPC service discovery running at http://0.0.0.0:${PORT}`);
+        logger.info(JSON.stringify({
+            "service" :'service_discovery',
+            "msg" : `LOG: gRPC service discovery running at https://0.0.0.0:${PORT}`
+        }))
         server.start();
     });
 
     // Graceful Shutdown
     async function shutdown(signal) {
         console.log(`Received ${signal}. Shutting down gracefully...`);
+        logger.info(JSON.stringify({
+            "service" :'service_discovery',
+            "msg" : `Received ${signal}. Shutting down gracefully...`
+        }))
         
         // Stop accepting new gRPC requests
         server.tryShutdown(async (err) => {
