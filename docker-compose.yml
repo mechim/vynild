@@ -217,10 +217,10 @@ services:
       - PORT=50051
     ports:
       - "50051:50051"
-    networks:
-      - pad-network
     volumes:
       - service_discovery-data:/app/logs
+    networks:
+      - pad-network
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.14.0
@@ -237,10 +237,10 @@ services:
     ports:
       - "9200:9200"
       - "9300:9300"
-    networks:
-      - pad-network
     volumes:
       - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - pad-network
 
   logstash:
     image: docker.elastic.co/logstash/logstash:7.14.0
@@ -248,12 +248,12 @@ services:
     ports:
       - "5000:5000"
       - "9600:9600"
-    networks:
-      - pad-network
     volumes:
       - ./config/logstash/pipeline:/usr/share/logstash/pipeline
     depends_on:
       - elasticsearch
+    networks:
+      - pad-network
 
   kibana:
     image: docker.elastic.co/kibana/kibana:7.14.0
@@ -262,29 +262,28 @@ services:
       - ELASTICSEARCH_URL=http://elasticsearch:9200
     ports:
       - "5601:5601"
-    networks:
-      - pad-network
     depends_on:
       - elasticsearch
+    networks:
+      - pad-network
 
   filebeat:
     image: docker.elastic.co/beats/filebeat:8.15.3
     container_name: filebeat
     command: ["filebeat", "-e", "-strict.perms=false"]
-    networks:
-      - pad-network
     volumes:
       - ./config/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml
       - service_discovery-data:/usr/share/filebeat/data
     depends_on:
       - logstash
+    networks:
+      - pad-network
 
 volumes:
   postgres_data_server_user:
   postgres_data_server_review:
   elasticsearch-data:
   service_discovery-data:
-
 
 networks:
   pad-network:

@@ -44,7 +44,7 @@ function registerService(call, callback) {
             callback(null, { success: true, detail: `Service ${serviceName} registered successfully.` });
             logger.info(JSON.stringify({
                 "service": 'service_discovery',
-                "msg": `LOG: Registered ${redisKey} at IP - ${ip}`,
+                "msg": `LOG: Registered ${redisKey} at IP - ${ipAddress}`,
             }));
         })
         .catch(err => {
