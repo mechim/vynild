@@ -91,13 +91,8 @@ DATABASES = {
 
 CHANNEL_LAYERS = {
     'default': {
-        "BACKEND": 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            'hosts': [
-                (os.getenv('REDIS_HOST'), os.getenv('REDIS_PORT')),
-            ] 
-        }
-    }
+        "BACKEND": 'channels.layers.InMemoryChannelLayer',
+    },
 }
 
 

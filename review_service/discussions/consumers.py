@@ -3,8 +3,8 @@ import json
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 import requests
 import os
-from django.core.cache import cache
 from channels.db import database_sync_to_async
+from review_service.utilities import cache_get, cache_set
 
 class DiscussionConsumer(AsyncJsonWebsocketConsumer):
     def get_token_from_headers(self, headers, _key):
@@ -24,8 +24,7 @@ class DiscussionConsumer(AsyncJsonWebsocketConsumer):
         
     async def fetch_username(self, user_id):
         cache_key = f"user_{user_id}_username"
-        print(cache_key)
-        cached_username = cache.get(cache_key)
+        cached_username = cache_get(cache_key)
         if cached_username:
             print(f"found cached username for user #{user_id}")
             return cached_username
@@ -38,7 +37,7 @@ class DiscussionConsumer(AsyncJsonWebsocketConsumer):
             if response.status_code == 200:
                 user_data = response.json()
                 username = user_data[0].get('username')
-                cache.set(cache_key, username, timeout=3600)
+                cache_set(cache_key, username, timeout=3600)
                 print(f"cached username for user #{user_id}")
                 return  username # Assuming the response contains a 'username' field
             else:

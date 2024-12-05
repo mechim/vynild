@@ -96,12 +96,13 @@ async function circuitBreak(requestData, ip, serviceType) {
             return response; // Return successful response
         } catch (error) {
             console.error(`Error on IP ${ip}: ${error.message}`);
-            logMsg(`ERROR: Error on IP ${ip}: ${error.message}`)
+            logMsg(`ERROR: Error on IP ${ip}: ${error.message}`);
             tries++;
             console.log(requestData.url);
-            if (error.response.status >= 400 && error.response.status < 500){
-                return error.response;
-            }
+            if (error.response != undefined)
+                if (error.response.status >= 400 && error.response.status < 500){
+                    return error.response;
+                }
             if (tries === 3) {
                 // After 3 failures, remove the failed IP and reroute
                 console.log(`IP ${ip} failed 3 times. Rerouting to a different instance.`);
@@ -127,9 +128,6 @@ async function circuitBreak(requestData, ip, serviceType) {
     // If all IPs fail, return an error
     return new Error(`All attempts failed for service type ${serviceType}`);
 }
-
-
-
 
 async function serviceLoad(ips){
     let minLoad = MAX_CONCURRENT_REQUESTS+1;
